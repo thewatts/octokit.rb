@@ -236,7 +236,7 @@ module Octokit
         end
       end
 
-      if application_authenticated?
+      if application_authenticated? && api_request?(path)
         options[:query].merge! application_authentication
       end
 
@@ -280,6 +280,10 @@ module Octokit
       opts[:headers] = headers unless headers.empty?
 
       opts
+    end
+
+    def api_request?(path)
+      path =~ %r{(^\/)|#{api_endpoint}}
     end
 
   end
