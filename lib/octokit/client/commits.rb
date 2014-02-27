@@ -280,11 +280,16 @@ module Octokit
 
       def params_for_commits(type, commit_arguments)
         date, end_date = dates_for(type, commit_arguments)
-        params = commit_arguments.options
-        params[:since] = iso8601(date) if date
-        params[:until] = iso8601(end_date) if end_date
+        params = commit_params_from_dates_args(date, end_date, commit_arguments)
         sha_or_branch = commit_arguments.pop
         params[:sha] = sha_or_branch if sha_or_branch
+        params
+      end
+
+      def commit_params_from_dates_args(start_date, end_date, arguments)
+        params = arguments.options
+        params[:since] = iso8601(start_date) if start_date
+        params[:until] = iso8601(end_date) if end_date
         params
       end
 
