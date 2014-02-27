@@ -1,4 +1,5 @@
 require 'date'
+require 'pry'
 
 module Octokit
   class Client
@@ -21,7 +22,7 @@ module Octokit
       # @return [Array<Sawyer::Resource>] An array of hashes representing commits
       # @see http://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
       def commits(*args)
-        arguments = Octokit::RepoArguments.new(args)
+        arguments = repo_arguments_from(args)
         sha_or_branch = arguments.pop
         if sha_or_branch
           arguments.options[:sha] = sha_or_branch
@@ -47,14 +48,8 @@ module Octokit
       # @example
       #   Octokit.commits_since('octokit/octokit.rb', '2012-10-01')
       def commits_since(*args)
-        arguments = Octokit::RepoArguments.new(args)
-        date   = parse_date(arguments.shift)
-        params = arguments.options
-        params.merge!(:since => iso8601(date))
-        sha_or_branch = arguments.pop
-        if sha_or_branch
-          params[:sha] = sha_or_branch
-        end
+        arguments = repo_arguments_from(args)
+        params = params_for_commits(:since, arguments)
         commits(arguments.repo, params)
       end
 
@@ -73,14 +68,8 @@ module Octokit
       # @example
       #   Octokit.commits_before('octokit/octokit.rb', '2012-10-01')
       def commits_before(*args)
-        arguments = Octokit::RepoArguments.new(args)
-        date   = parse_date(arguments.shift)
-        params = arguments.options
-        params.merge!(:until => iso8601(date))
-        sha_or_branch = arguments.pop
-        if sha_or_branch
-          params[:sha] = sha_or_branch
-        end
+        arguments = repo_arguments_from(args)
+        params = params_for_commits(:before, arguments)
         commits(arguments.repo, params)
       end
 
@@ -99,15 +88,8 @@ module Octokit
       # @example
       #   Octokit.commits_on('octokit/octokit.rb', '2012-10-01')
       def commits_on(*args)
-        arguments = Octokit::RepoArguments.new(args)
-        date   = parse_date(arguments.shift)
-        params = arguments.options
-        end_date = date + 1
-        params.merge!(:since => iso8601(date), :until => iso8601(end_date))
-        sha_or_branch = arguments.pop
-        if sha_or_branch
-          params[:sha] = sha_or_branch
-        end
+        arguments = repo_arguments_from(args)
+        params = params_for_commits(:on, arguments)
         commits(arguments.repo, params)
       end
 
@@ -128,17 +110,8 @@ module Octokit
       # @example
       #   Octokit.commits_on('octokit/octokit.rb', '2012-10-01', '2012-11-01')
       def commits_between(*args)
-        arguments = Octokit::RepoArguments.new(args)
-        date       = parse_date(arguments.shift)
-        end_date   = parse_date(arguments.shift)
-        raise ArgumentError, "Start date #{date} does not precede #{end_date}" if date > end_date
-
-        params = arguments.options
-        params.merge!(:since => iso8601(date), :until => iso8601(end_date))
-        sha_or_branch = arguments.pop
-        if sha_or_branch
-          params[:sha] = sha_or_branch
-        end
+        arguments = repo_arguments_from(args)
+        params = params_for_commits(:between, arguments)
         commits(arguments.repo, params)
       end
 
@@ -300,6 +273,38 @@ module Octokit
       end
 
       protected
+
+      def repo_arguments_from(commit_args)
+        Octokit::RepoArguments.new(commit_args)
+      end
+
+      def params_for_commits(type, commit_arguments)
+        date, end_date = dates_for(type, commit_arguments)
+        params = commit_arguments.options
+        params[:since] = iso8601(date) if date
+        params[:until] = iso8601(end_date) if end_date
+        sha_or_branch = commit_arguments.pop
+        params[:sha] = sha_or_branch if sha_or_branch
+        params
+      end
+
+      def dates_for(type, commit_arguments)
+        date, end_date = nil
+        case type
+        when :since
+          date = parse_date(commit_arguments.shift)
+        when :before
+          end_date = parse_date(commit_arguments.shift)
+        when :on
+          date = parse_date(commit_arguments.shift)
+          end_date = date + 1
+        when :between
+          date = parse_date(commit_arguments.shift)
+          end_date = parse_date(commit_arguments.shift)
+          raise ArgumentError, "Start date #{date} does not precede #{end_date}" if date > end_date
+        end
+        [date, end_date]
+      end
 
       def iso8601(date)
         if date.respond_to?(:iso8601)
